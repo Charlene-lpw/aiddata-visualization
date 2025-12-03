@@ -1,0 +1,1510 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Global Aid Analysis – Three Visualizations</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script src="https://d3js.org/topojson.v3.min.js"></script>
+
+    <style>
+        body {
+            background: #f5f5f5;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+        }
+
+        .main-container {
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            text-align: center;
+            font-size: 36px;
+            font-weight: 700;
+            color: #1a1a1a;
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            text-align: center;
+            font-size: 16px;
+            color: #666;
+            margin-bottom: 30px;
+            line-height: 1.6;
+        }
+
+        .global-viz-controls {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 15px;
+            font-size: 14px;
+            background: #e6f7ff;
+            padding: 15px 30px;
+            border-radius: 12px;
+            border: 3px solid #667eea;
+            margin: 20px auto 40px auto;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            width: fit-content;
+        }
+
+        .global-viz-controls input[type="range"] {
+            width: 400px;
+            cursor: pointer;
+        }
+
+        .global-year-display {
+            font-size: 22px;
+            font-weight: 700;
+            color: #4c78a8;
+            min-width: 120px;
+            text-align: center;
+            transition: all 0.3s;
+        }
+
+        .global-year-display.animating {
+            color: #2563eb;
+            font-size: 24px;
+            text-shadow: 0 0 10px rgba(37, 99, 235, 0.6);
+        }
+
+        .play-button-large {
+            padding: 10px 22px;
+            font-size: 16px;
+            border-radius: 8px;
+            border: 2px solid #4c78a8;
+            cursor: pointer;
+            background: #fff;
+            color: #4c78a8;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+
+        .play-button-large:hover {
+            background: #4c78a8;
+            color: white;
+        }
+
+        .play-button-large.playing {
+            background: #4c78a8;
+            color: white;
+            border-color: #38a169;
+            box-shadow: 0 0 10px rgba(76, 120, 168, 0.5);
+        }
+
+        /* Visualization Sections */
+        .viz-section {
+            background: #fff;
+            border-radius: 12px;
+            padding: 25px 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+
+        .viz-header {
+            margin-bottom: 10px;
+            border-bottom: 3px solid #667eea;
+            padding-bottom: 10px;
+        }
+
+        .viz-title-group {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .viz-number {
+            display: inline-block;
+            background: #667eea;
+            color: white;
+            padding: 6px 14px;
+            border-radius: 6px;
+            font-weight: 700;
+            font-size: 14px;
+            margin-bottom: 8px;
+        }
+
+        .viz-title {
+            font-size: 24px;
+            font-weight: 700;
+            color: #1a1a1a;
+            margin: 8px 0;
+        }
+
+        .viz-question {
+            font-size: 14px;
+            color: #555;
+            font-style: italic;
+            margin-top: 8px;
+        }
+
+        /* Layouts */
+        .viz-layout-single {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 25px;
+            margin-top: 20px;
+        }
+
+        .viz-layout-double {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 25px;
+            margin-top: 20px;
+        }
+
+        .viz-pair-container {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .map-container {
+            background: #fafafa;
+            border-radius: 8px;
+            padding: 15px;
+            border: 1px solid #e0e0e0;
+        }
+
+        .map-title {
+            font-size: 15px;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 10px;
+            text-align: center;
+        }
+
+        .map-svg-container {
+            width: 100%;
+            height: 400px;
+            position: relative;
+        }
+
+        .year-indicator {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 700;
+            color: #2563eb;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+            opacity: 0;
+            transition: opacity 0.3s;
+            pointer-events: none;
+            z-index: 100;
+        }
+
+        .year-indicator.active {
+            opacity: 1;
+        }
+
+        .sidebar {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .legend-box {
+            background: #fafafa;
+            border-radius: 8px;
+            padding: 15px 18px;
+            border: 1px solid #e0e0e0;
+        }
+
+        .legend-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 8px;
+            text-align: center;
+        }
+
+        .legend-gradient {
+            height: 20px;
+            border-radius: 4px;
+            margin-bottom: 8px;
+        }
+
+        .legend-labels {
+            display: flex;
+            justify-content: space-between;
+            font-size: 11px;
+            color: #666;
+        }
+
+        .bar-chart-box {
+            background: #fafafa;
+            border-radius: 8px;
+            padding: 15px;
+            border: 1px solid #e0e0e0;
+        }
+
+        /* VIZ 2 & 3 bar styles */
+        .bar-item {
+            display: flex;
+            align-items: center;
+            margin: 8px 0;
+            padding: 6px;
+            border-radius: 4px;
+            transition: background 0.15s;
+            cursor: pointer;
+        }
+
+        .bar-item:hover {
+            background: #fff3cd;
+        }
+
+        .bar-item.bar-highlighted {
+            background: #fff3cd;
+        }
+
+        .bar-rank {
+            width: 24px;
+            font-size: 11px;
+            color: #999;
+            text-align: right;
+            margin-right: 8px;
+        }
+
+        .bar-label {
+            width: 90px;
+            font-size: 12px;
+            color: #333;
+            overflow: hidden;
+            white-space: nowrap;
+            text-overflow: ellipsis;
+            margin-right: 8px;
+        }
+
+        .bar-viz {
+            flex: 1;
+            height: 24px;
+            background: #e9ecef;
+            border-radius: 4px;
+            overflow: hidden;
+            position: relative;
+            margin-right: 8px;
+        }
+
+        .bar-fill {
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            padding-right: 6px;
+            color: #fff;
+            font-size: 10px;
+            font-weight: 600;
+            transition: width 0.5s ease-out, background 0.5s ease-out;
+        }
+
+        .bar-value {
+            font-size: 11px;
+            color: #555;
+            font-weight: 600;
+            min-width: 60px;
+            text-align: right;
+        }
+
+        /* VIZ 1 butterfly styles */
+        .bar-chart-group-diverging {
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .bar-diverging-container {
+            padding: 5px 0;
+            font-size: 12px;
+            margin: 0 auto;
+            max-width: 100%;
+        }
+
+        .paired-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin: 2px 0;
+            padding: 4px 0;
+            transition: background 0.15s;
+        }
+
+        .paired-row:hover {
+            background: #fff3cd;
+        }
+
+        .paired-row.bar-highlighted {
+            background: #fff3cd;
+        }
+
+        .recipient-label {
+            text-align: right;
+            font-weight: 600;
+            font-size: 12px;
+            color: #333;
+            width: 60px;
+            overflow: hidden;
+            white-space: nowrap;
+            text-overflow: ellipsis;
+            padding-right: 2px;
+            cursor: pointer;
+        }
+
+        .recipient-rank {
+            width: 15px;
+            text-align: right;
+            font-size: 11px;
+            color: #999;
+            padding-right: 5px;
+        }
+
+        .donor-rank {
+            width: 15px;
+            text-align: left;
+            font-size: 11px;
+            color: #999;
+            padding-left: 5px;
+        }
+
+        .donor-label {
+            text-align: left;
+            font-weight: 600;
+            font-size: 12px;
+            color: #333;
+            width: 60px;
+            overflow: hidden;
+            white-space: nowrap;
+            text-overflow: ellipsis;
+            padding-left: 2px;
+            cursor: pointer;
+        }
+
+        .central-axis {
+            display: flex;
+            align-items: center;
+            flex-grow: 1;
+            height: 20px;
+            border-left: 1px solid #aaa;
+            border-right: 1px solid #aaa;
+        }
+
+        .recipient-bar-area {
+            display: flex;
+            justify-content: flex-start;
+            align-items: center;
+            flex: 1;
+            height: 100%;
+        }
+
+        .donor-bar-area {
+            display: flex;
+            justify-content: flex-end;
+            align-items: center;
+            flex: 1;
+            height: 100%;
+        }
+
+        .bar-segment {
+            height: 80%;
+            position: relative;
+            border-radius: 2px;
+            transition: width 0.5s ease-out, background 0.5s ease-out;
+            display: flex;
+            align-items: center;
+            min-width: 1px;
+            max-width: 100%;
+        }
+
+        .donor-bar-segment {
+            justify-content: flex-end;
+            margin-right: 1px;
+        }
+
+        .recipient-bar-segment {
+            justify-content: flex-start;
+            margin-left: 1px;
+        }
+
+        .bar-value-text {
+            font-size: 10px;
+            font-weight: 600;
+            position: absolute;
+            z-index: 2;
+            padding: 0 4px;
+            white-space: nowrap;
+        }
+
+        .donor-value-text {
+            right: 0;
+        }
+
+        .recipient-value-text {
+            left: 0;
+        }
+
+        .summary-box {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 15px 18px;
+            border-radius: 8px;
+            font-size: 13px;
+            line-height: 1.6;
+            margin-top: 15px;
+        }
+
+        .summary-box strong {
+            font-weight: 700;
+        }
+
+        .country-path {
+            stroke: #999;
+            stroke-width: 0.4;
+            cursor: pointer;
+            transition: stroke 0.2s, stroke-width 0.2s, fill 0.5s ease-out;
+        }
+
+        .country-path:hover {
+            stroke: #000;
+            stroke-width: 1.5;
+        }
+
+        .highlighted {
+            stroke: #ff6b6b !important;
+            stroke-width: 2.5 !important;
+            filter: drop-shadow(0 0 4px rgba(255,107,107,0.8));
+        }
+
+        .tooltip {
+            position: absolute;
+            background: rgba(0,0,0,0.92);
+            color: #fff;
+            padding: 10px 14px;
+            border-radius: 6px;
+            font-size: 12px;
+            max-width: 280px;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.15s;
+            z-index: 1000;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        }
+
+        .tooltip-country {
+            font-weight: 700;
+            font-size: 14px;
+            margin-bottom: 6px;
+            border-bottom: 1px solid rgba(255,255,255,0.35);
+            padding-bottom: 4px;
+        }
+
+        .purpose-selector {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 15px;
+            padding: 10px;
+            background: #e3f2fd;
+            border-radius: 6px;
+        }
+
+        .purpose-selector label {
+            font-size: 13px;
+            font-weight: 600;
+            color: #444;
+        }
+
+        .purpose-selector select {
+            flex: 1;
+            padding: 6px 10px;
+            border-radius: 6px;
+            border: 1px solid #ccc;
+            font-size: 13px;
+            cursor: pointer;
+        }
+
+        @media (max-width: 1200px) {
+            .viz-layout-single, .viz-layout-double {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+<div class="main-container">
+    <h1>Mapping Global Aid Flows: A Geo-Visual Analysis of Donor and Recipient Relationships (1973–2013)</h1>
+    <p class="subtitle">
+        <strong>Viz 1:</strong> Net flow showing <span style="color:#2166ac;">blue = net recipients (+)</span> and <span style="color:#b2182b;">red = net donors (-)</span><br>
+        <strong>Viz 2:</strong> Side-by-side comparison showing geographic clustering of donors vs. recipients<br>
+        <strong>Viz 3:</strong> Purpose-specific distribution (static - all years combined)
+    </p>
+
+    <div class="global-viz-controls">
+        <button id="play-button-global" class="play-button-large">▶ Start Animation</button>
+        <input type="range" id="year-slider-global" min="1973" max="2013" step="1" value="2013">
+        <div class="global-year-display" id="year-label-global">1973–2013</div>
+    </div>
+
+    <!-- VIZ 1 -->
+    <div class="viz-section">
+        <div class="viz-header">
+            <div class="viz-title-group">
+                <div>
+                    <div class="viz-number">VISUALIZATION 1</div>
+                    <div class="viz-title">Net Flow: Recipients (+) vs Donors (-) (1973–<span id="viz1-year">2013</span>)</div>
+                </div>
+            </div>
+            <div class="viz-question">
+                How do the countries compare in terms of how much they receive and donate?
+                Are there countries that receive much more than they donate (positive net flow) or donate much more than they receive (negative net flow)?
+            </div>
+        </div>
+
+        <div class="viz-layout-single">
+            <div class="map-container">
+                <div class="map-title">Net Aid Flow Map (Received − Donated)</div>
+                <div id="map1" class="map-svg-container">
+                    <div class="year-indicator" id="year-indicator-1">Year: <span id="year-text-1">2013</span></div>
+                </div>
+            </div>
+
+            <div class="sidebar">
+                <div class="legend-box">
+                    <div class="legend-title">Net Flow Scale (Received − Donated)</div>
+                    <svg width="100%" height="150" id="legend1-svg">
+                        <defs>
+                            <linearGradient id="grad-net" x1="0%" y1="0%" x2="100%" y2="0%">
+                                <stop offset="0%" style="stop-color:#b2182b;stop-opacity:1" />
+                                <stop offset="25%" style="stop-color:#f4a582;stop-opacity:1" />
+                                <stop offset="50%" style="stop-color:#f7f7f7;stop-opacity:1" />
+                                <stop offset="75%" style="stop-color:#67a9cf;stop-opacity:1" />
+                                <stop offset="100%" style="stop-color:#2166ac;stop-opacity:1" />
+                            </linearGradient>
+                        </defs>
+
+                        <rect x="40" y="35" width="350" height="35" fill="url(#grad-net)" stroke="#999" stroke-width="1" rx="4"/>
+
+                        <text x="40" y="90" font-size="14" fill="#b2182b" font-weight="700">Negative Net Flow</text>
+                        <text x="40" y="105" font-size="12" fill="#b2182b">(Donate more)</text>
+
+                        <text x="390" y="90" font-size="14" fill="#2166ac" font-weight="700" text-anchor="end">Positive Net Flow</text>
+                        <text x="390" y="105" font-size="12" fill="#2166ac" text-anchor="end">(Receive more)</text>
+                    </svg>
+                </div>
+
+                <div class="bar-chart-box" style="flex: unset; padding: 15px 5px;">
+                    <div class="bar-chart-title" style="border-bottom: none; text-align: center;">Net Flow Comparison (Top 10 Donors vs. Recipients)</div>
+                    <div class="bar-diverging-container">
+                        <div id="bars1-diverging" class="bar-chart-group-diverging"></div>
+                    </div>
+                </div>
+
+                <div class="summary-box" id="summary1"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- VIZ 2 -->
+    <div class="viz-section">
+        <div class="viz-header">
+            <div class="viz-title-group">
+                <div>
+                    <div class="viz-number">VISUALIZATION 2</div>
+                    <div class="viz-title">Geographic Clustering: Donation & Receipt Patterns (1973–<span id="viz2-year">2013</span>)</div>
+                </div>
+            </div>
+            <div class="viz-question">
+                Do the countries that mostly receive or mostly donate tend to cluster around specific geographical areas?
+                Are there neighboring countries that have radically different patterns?
+            </div>
+        </div>
+
+        <div class="viz-layout-double">
+            <div class="viz-pair-container">
+                <div class="map-container">
+                    <div class="map-title">🔴 Total Aid Donated</div>
+                    <div id="map2-donated" class="map-svg-container">
+                        <div class="year-indicator" id="year-indicator-2a">Year: <span id="year-text-2a">2013</span></div>
+                    </div>
+                    <div class="legend-box" style="margin-top: 10px;">
+                        <div class="legend-gradient" id="legend2-donated"></div>
+                        <div class="legend-labels">
+                            <span>Low</span>
+                            <span>High</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bar-chart-box">
+                    <div class="bar-chart-title">Top Donors</div>
+                    <div id="bars2-donors"></div>
+                </div>
+            </div>
+
+            <div class="viz-pair-container">
+                <div class="map-container">
+                    <div class="map-title">🔵 Total Aid Received</div>
+                    <div id="map2-received" class="map-svg-container">
+                        <div class="year-indicator" id="year-indicator-2b">Year: <span id="year-text-2b">2013</span></div>
+                    </div>
+                    <div class="legend-box" style="margin-top: 10px;">
+                        <div class="legend-gradient" id="legend2-received"></div>
+                        <div class="legend-labels">
+                            <span>Low</span>
+                            <span>High</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bar-chart-box">
+                    <div class="bar-chart-title">Top Recipients</div>
+                    <div id="bars2-recipients"></div>
+                </div>
+            </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 25px; margin-top: 25px;">
+            <div style="background: #f0f8ff; padding: 15px 12px; border-radius: 8px; font-size: 13px; color: #1976D2; border: 1px solid #bbdefb;">
+                💡 <strong>Tip:</strong> Bar colors match map intensity - darker colors = higher amounts. The maps and lists above are now aligned vertically by role (Donor pair on the left, Recipient pair on the right).
+            </div>
+            <div class="summary-box" id="summary2"></div>
+        </div>
+    </div>
+
+    <!-- VIZ 3 -->
+    <div class="viz-section" style="border: 3px solid #2196F3; background: #f0f8ff;">
+        <div class="viz-header" style="border-bottom-color: #2196F3;">
+            <div class="viz-number" style="background: #2196F3;">VISUALIZATION 3</div>
+            <div class="viz-title">Aid Purpose Distribution Across Countries (All Years: 1973–2013)</div>
+            <div class="viz-question">
+                Are there major differences in how the top 5 most frequent purposes distribute geographically?
+                Do certain countries receive more of specific types of aid?
+            </div>
+        </div>
+
+        <div class="purpose-selector">
+            <label>📊 Select Aid Purpose:</label>
+            <select id="purpose-select"></select>
+            <span style="margin-left: 10px; color: #1976D2; font-size: 12px; font-weight: 600;">
+                ⓘ Static view - Complete 40-year dataset
+            </span>
+        </div>
+
+        <div class="viz-layout-single">
+            <div class="map-container">
+                <div class="map-title" id="map3-title">Aid Purpose Distribution</div>
+                <div id="map3" class="map-svg-container"></div>
+            </div>
+
+            <div class="sidebar">
+                <div class="legend-box">
+                    <div class="legend-title">Aid Amount</div>
+                    <div class="legend-gradient" id="legend3"></div>
+                    <div class="legend-labels">
+                        <span>Low</span>
+                        <span>High</span>
+                    </div>
+                </div>
+
+                <div class="bar-chart-box">
+                    <div class="bar-chart-title">Top 10 Recipients</div>
+                    <div id="bars3"></div>
+                </div>
+
+                <div class="summary-box" id="summary3"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="tooltip" class="tooltip"></div>
+
+<script>
+// ---------- CONFIG & GLOBALS ----------
+const countryNameMap = {
+    "United States": "United States of America",
+    "Czech Republic": "Czechia",
+    "Slovak Republic": "Slovakia",
+    "Korea": "South Korea",
+    "Democratic Republic of the Congo": "Dem. Rep. Congo",
+    "Republic of Congo": "Congo"
+};
+
+function normalizeCountry(name) {
+    return countryNameMap[name] || name;
+}
+
+let allAidData = [];
+let countriesGeo = [];
+let countryStats = new Map();
+let purposeData = {};
+let top5Purposes = [];
+
+let projection, path;
+let svg1, svg2donated, svg2received, svg3;
+let map1Paths, map2DonatedPaths, map2ReceivedPaths, map3Paths;
+
+let minYearGlobal = 1973;
+let maxYearGlobal = 2013;
+let currentYear = 2013;
+
+let playingGlobal = false;
+let playIntervalGlobal = null;
+
+const sliderGlobal = document.getElementById("year-slider-global");
+const labelGlobal = document.getElementById("year-label-global");
+const tooltip = d3.select("#tooltip");
+const fmtShort = d3.format("$,.2s");
+
+// Helper: auto-contrast label color based on bar background
+function getTextColor(bgColor) {
+    const c = d3.color(bgColor);
+    const L = (0.299 * c.r + 0.587 * c.g + 0.114 * c.b) / 255;
+    return L < 0.5 ? "white" : "black";
+}
+
+// ---------- DATA LOADING ----------
+Promise.all([
+    d3.csv("aiddata-countries-only.csv"),
+    d3.json("https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json")
+]).then(([aid, world]) => {
+    aid.forEach(d => {
+        d.commitment_amount_usd_constant = +d.commitment_amount_usd_constant;
+        d.donor = normalizeCountry(d.donor);
+        d.recipient = normalizeCountry(d.recipient);
+        d.year = +d.year;
+    });
+
+    allAidData = aid;
+    countriesGeo = topojson.feature(world, world.objects.countries).features;
+
+    const years = allAidData.map(d => d.year).filter(y => !isNaN(y));
+    minYearGlobal = d3.min(years);
+    maxYearGlobal = d3.max(years);
+    currentYear = maxYearGlobal;
+
+    sliderGlobal.min = minYearGlobal;
+    sliderGlobal.max = maxYearGlobal;
+    sliderGlobal.value = currentYear;
+    labelGlobal.textContent = `${minYearGlobal}–${currentYear}`;
+
+    document.getElementById("viz1-year").textContent = currentYear;
+    document.getElementById("viz2-year").textContent = currentYear;
+
+    projection = d3.geoNaturalEarth1().fitSize([600, 380], { type: "Sphere" });
+    path = d3.geoPath(projection);
+
+    const cumulativeData = filterCumulative(minYearGlobal, currentYear);
+    countryStats = computeCountryStats(cumulativeData);
+
+    computePurposeData();
+    initPurposeSelector();
+
+    initVisualization1();
+    initVisualization2();
+    initVisualization3(top5Purposes[0]);
+
+    sliderGlobal.addEventListener("input", function() {
+        handleStopGlobal();
+        updateYear(this.value);
+    });
+
+    updateVisualization1();
+    updateVisualization2();
+}).catch(err => {
+    console.error("Error loading data:", err);
+});
+
+// ---------- HELPERS ----------
+function filterCumulative(startYear, endYear) {
+    return allAidData.filter(d => d.year >= startYear && d.year <= endYear);
+}
+
+function computeCountryStats(data) {
+    const donatedRollup = d3.rollup(
+        data,
+        v => d3.sum(v, d => d.commitment_amount_usd_constant),
+        d => d.donor
+    );
+    const receivedRollup = d3.rollup(
+        data,
+        v => d3.sum(v, d => d.commitment_amount_usd_constant),
+        d => d.recipient
+    );
+
+    const allNames = new Set([...donatedRollup.keys(), ...receivedRollup.keys()]);
+    const stats = new Map();
+
+    allNames.forEach(name => {
+        const donated = donatedRollup.get(name) || 0;
+        const received = receivedRollup.get(name) || 0;
+        const net = received - donated; // Received − Donated
+        stats.set(name, { country: name, donated, received, net });
+    });
+
+    return stats;
+}
+
+function computePurposeData() {
+    const purposeTotals = d3.rollup(
+        allAidData,
+        v => d3.sum(v, d => d.commitment_amount_usd_constant),
+        d => d.coalesced_purpose_name
+    );
+
+    top5Purposes = Array.from(purposeTotals.entries())
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 5)
+        .map(d => d[0]);
+
+    top5Purposes.forEach(purpose => {
+        const filtered = allAidData.filter(d => d.coalesced_purpose_name === purpose);
+        const byCountry = d3.rollup(
+            filtered,
+            v => d3.sum(v, d => d.commitment_amount_usd_constant),
+            d => normalizeCountry(d.recipient)
+        );
+        const total = d3.sum(filtered, d => d.commitment_amount_usd_constant);
+        const countries = new Set(filtered.map(d => normalizeCountry(d.recipient))).size;
+        const entries = Array.from(byCountry.entries()).sort((a, b) => b[1] - a[1]);
+        const top10Total = d3.sum(entries.slice(0, 10), e => e[1]);
+        const concentration = +(top10Total / total * 100).toFixed(1);
+
+        purposeData[purpose] = { byCountry, total, countries, entries, concentration };
+    });
+}
+
+function initPurposeSelector() {
+    const select = d3.select("#purpose-select");
+    select.selectAll("option")
+        .data(top5Purposes)
+        .enter()
+        .append("option")
+        .attr("value", d => d)
+        .text(d => d);
+
+    select.on("change", function () {
+        updateVisualization3(this.value);
+    });
+}
+
+// ---------- VIZ 1: NET FLOW ----------
+function initVisualization1() {
+    svg1 = d3.select("#map1")
+        .append("svg")
+        .attr("width", "100%")
+        .attr("height", "100%")
+        .attr("viewBox", "0 0 600 400");
+
+    map1Paths = svg1.selectAll("path")
+        .data(countriesGeo)
+        .enter()
+        .append("path")
+        .attr("class", "country-path")
+        .attr("data-country", d => d.properties.name)
+        .attr("d", path)
+        .on("mouseover", function (event, d) {
+            const c = d.properties.name;
+            const stats = countryStats.get(c);
+            d3.select(this).classed("highlighted", true);
+
+            d3.selectAll(`.bar-item[data-country="${c}"]`).classed("bar-highlighted", true);
+            d3.selectAll(`.paired-row`).filter(r => r && (r.recipient.country === c || r.donor.country === c)).classed("bar-highlighted", true);
+
+            if (stats) {
+                const netLabel = stats.net >= 0 ? "Net Recipient" : "Net Donor";
+                const netColor = stats.net >= 0 ? "#2166ac" : "#b2182b";
+                tooltip.style("opacity", 1).html(`
+                    <div class="tooltip-country">${c}</div>
+                    <div style="color:#d73027;">Donated: ${fmtShort(stats.donated)}</div>
+                    <div style="color:#4575b4;">Received: ${fmtShort(stats.received)}</div>
+                    <div style="border-top: 1px solid rgba(255,255,255,0.3); padding-top: 4px; margin-top: 4px; color:${netColor};">
+                        <strong>${netLabel}: ${stats.net >= 0 ? "+" : ""}${fmtShort(stats.net)}</strong>
+                    </div>
+                `);
+            }
+        })
+        .on("mousemove", event => {
+            tooltip
+                .style("left", (event.pageX + 10) + "px")
+                .style("top", (event.pageY - 6) + "px");
+        })
+        .on("mouseout", function () {
+            d3.select(this).classed("highlighted", false);
+            d3.selectAll(".bar-item").classed("bar-highlighted", false);
+            d3.selectAll(".paired-row").classed("bar-highlighted", false);
+            tooltip.style("opacity", 0);
+        });
+}
+
+function renderDivergingBars(selector, pairedData, maxAbs, donorScale, recipientScale) {
+    const container = d3.select(selector);
+    container.selectAll("*").remove();
+
+    pairedData.forEach((pair, i) => {
+        const donor = pair.donor;
+        const recipient = pair.recipient;
+
+        const row = container.append("div").attr("class", "paired-row");
+
+        // Recipient label + rank (left side)
+        row.append("div")
+            .attr("class", "recipient-label")
+            .text(recipient.country);
+        row.append("div")
+            .attr("class", "recipient-rank")
+            .text(i + 1);
+
+        const centralAxis = row.append("div").attr("class", "central-axis");
+
+        // Donor bar area (left of center)
+        const donorBarArea = centralAxis.append("div").attr("class", "donor-bar-area");
+        if (donor.net < 0) {
+            const netValueAbs = Math.abs(donor.net);
+            const barColor = donorScale(netValueAbs);
+            const pct = (netValueAbs / maxAbs) * 100;
+
+            const barSegment = donorBarArea.append("div")
+                .attr("class", "bar-segment donor-bar-segment")
+                .attr("data-country", donor.country)
+                .style("background", barColor)
+                .style("width", "0%");
+
+            barSegment.transition()
+                .duration(600)
+                .delay(i * 50)
+                .style("width", `${pct}%`);
+
+            barSegment.append("div")
+                .attr("class", "bar-value-text donor-value-text")
+                .style("color", getTextColor(barColor))
+                .text(fmtShort(donor.net));
+        }
+
+        // Recipient bar area (right of center)
+        const recipientBarArea = centralAxis.append("div").attr("class", "recipient-bar-area");
+        if (recipient.net > 0) {
+            const netValueAbs = recipient.net;
+            const barColor = recipientScale(netValueAbs);
+            const pct = (netValueAbs / maxAbs) * 100;
+
+            const barSegment = recipientBarArea.append("div")
+                .attr("class", "bar-segment recipient-bar-segment")
+                .attr("data-country", recipient.country)
+                .style("background", barColor)
+                .style("width", "0%");
+
+            barSegment.transition()
+                .duration(600)
+                .delay(i * 50)
+                .style("width", `${pct}%`);
+
+            barSegment.append("div")
+                .attr("class", "bar-value-text recipient-value-text")
+                .style("color", getTextColor(barColor))
+                .text(fmtShort(recipient.net));
+        }
+
+        // Donor rank + label (right side)
+        row.append("div")
+            .attr("class", "donor-rank")
+            .text(i + 1);
+        row.append("div")
+            .attr("class", "donor-label")
+            .text(donor.country);
+
+        const allCountriesInRow = [recipient.country, donor.country].filter(c => c !== '—');
+
+        row.on("mouseover", () => {
+            row.classed("bar-highlighted", true);
+            allCountriesInRow.forEach(c =>
+                d3.selectAll(`.country-path[data-country="${c}"]`).classed("highlighted", true)
+            );
+            d3.selectAll(`.bar-item[data-country="${recipient.country}"]`).classed("bar-highlighted", true);
+            d3.selectAll(`.bar-item[data-country="${donor.country}"]`).classed("bar-highlighted", true);
+        }).on("mouseout", () => {
+            row.classed("bar-highlighted", false);
+            d3.selectAll(".country-path").classed("highlighted", false);
+            d3.selectAll(".bar-item").classed("bar-highlighted", false);
+        });
+    });
+}
+
+function updateNetFlowSummary(selector, data) {
+    const biggestRecipient = data
+        .filter(d => d.net >= 0)
+        .reduce((a, b) => (a.net > b.net ? a : b), {country: "N/A", net: 0});
+    const biggestDonor = data
+        .filter(d => d.net < 0)
+        .reduce((a, b) => (a.net < b.net ? a : b), {country: "N/A", net: 0});
+
+    const donorRegions = "North America, Western Europe, and East Asia";
+    const recipientRegions = "South Asia, Sub-Saharan Africa, and Latin America";
+
+    d3.select(selector).html(`
+        <strong>Net Flow Summary (${minYearGlobal}–${currentYear})</strong><br>
+        <strong>${biggestRecipient.country}</strong> is the largest net recipient, receiving
+        <strong>${fmtShort(biggestRecipient.net)}</strong> more than it donates.<br>
+        <strong>${biggestDonor.country}</strong> is the largest net donor, giving
+        <strong>${fmtShort(Math.abs(biggestDonor.net))}</strong> more than it receives.<br><br>
+        Donor countries are mostly located in <strong>${donorRegions}</strong>,
+        while recipient countries are concentrated in <strong>${recipientRegions}</strong>.
+    `);
+}
+
+function updateVisualization1() {
+    if (!countryStats || countryStats.size === 0) return;
+
+    const currentEndYear = currentYear;
+    document.getElementById("viz1-year").textContent = currentEndYear;
+    document.getElementById("year-text-1").textContent = currentEndYear;
+
+    const allNetCountries = Array.from(countryStats.values())
+        .filter(d => d.donated !== 0 || d.received !== 0);
+
+    const topRecipients = allNetCountries
+        .filter(d => d.net > 0)
+        .sort((a, b) => b.net - a.net)
+        .slice(0, 10);
+
+    const topDonors = allNetCountries
+        .filter(d => d.net < 0)
+        .sort((a, b) => a.net - b.net)
+        .slice(0, 10);
+
+    const maxRecipientNet = d3.max(topRecipients, d => d.net) || 0;
+    const maxDonorNetAbs = d3.max(topDonors, d => Math.abs(d.net)) || 0;
+    const maxAbs = Math.max(maxRecipientNet, maxDonorNetAbs) || 1;
+
+    const pairedData = [];
+    const maxRows = 10;
+    for (let i = 0; i < maxRows; i++) {
+        const recipient = topRecipients[i] || { country: '—', net: 0, donated: 0, received: 0 };
+        const donor = topDonors[i] || { country: '—', net: 0, donated: 0, received: 0 };
+        pairedData.push({ recipient, donor });
+    }
+
+    // Option A palette for bars
+    const donorScale = d3.scaleLinear()
+        .domain([0, maxAbs])
+        .range(["#fcae91", "#de2d26"]);   // light red → bold red
+
+    const recipientScale = d3.scaleLinear()
+        .domain([0, maxAbs])
+        .range(["#9ecae1", "#3182bd"]);   // light blue → bold blue
+
+    // Diverging color scale for map
+    const netDivergingScale = d3.scaleDiverging(d3.interpolateRdBu)
+        .domain([-maxAbs, 0, maxAbs]);
+
+    function netColor(value) {
+        if (value === 0) return "#f0f0f0";
+        return netDivergingScale(value);
+    }
+
+    map1Paths
+        .transition()
+        .duration(500)
+        .attr("fill", d => {
+            const stats = countryStats.get(d.properties.name);
+            if (!stats) return "#f0f0f0";
+            return netColor(stats.net);
+        })
+        .style("opacity", 1);
+
+    renderDivergingBars("#bars1-diverging", pairedData, maxAbs, donorScale, recipientScale);
+    updateNetFlowSummary("#summary1", allNetCountries);
+}
+
+// ---------- VIZ 2 ----------
+function initVisualization2() {
+    // Donated map
+    svg2donated = d3.select("#map2-donated")
+        .append("svg")
+        .attr("width", "100%")
+        .attr("height", "100%")
+        .attr("viewBox", "0 0 600 400");
+
+    const legendDonatedSvg = d3.select("#legend2-donated")
+        .append("svg")
+        .attr("width", "100%")
+        .attr("height", 20);
+
+    const gradientDonated = legendDonatedSvg.append("defs")
+        .append("linearGradient")
+        .attr("id", "gradient-donated");
+
+    gradientDonated.append("stop").attr("offset", "0%").attr("stop-color", "#fee5d9");
+    gradientDonated.append("stop").attr("offset", "50%").attr("stop-color", "#fc9272");
+    gradientDonated.append("stop").attr("offset", "100%").attr("stop-color", "#a50f15");
+
+    legendDonatedSvg.append("rect")
+        .attr("width", "100%")
+        .attr("height", 20)
+        .style("fill", "url(#gradient-donated)");
+
+    map2DonatedPaths = svg2donated.selectAll("path")
+        .data(countriesGeo)
+        .enter()
+        .append("path")
+        .attr("class", "country-path")
+        .attr("data-country", d => d.properties.name)
+        .attr("d", path)
+        .on("mouseover", function (event, d) {
+            const stats = countryStats.get(d.properties.name);
+            d3.select(this).classed("highlighted", true);
+            d3.selectAll(`.bar-item[data-country="${d.properties.name}"]`).classed("bar-highlighted", true);
+            d3.selectAll(`.paired-row`).filter(r => r.donor.country === d.properties.name).classed("bar-highlighted", true);
+
+            if (stats) {
+                tooltip.style("opacity", 1).html(`
+                    <div class="tooltip-country">${d.properties.name}</div>
+                    <div>Donated: ${fmtShort(stats.donated)}</div>
+                `);
+            }
+        })
+        .on("mousemove", event => {
+            tooltip
+                .style("left", (event.pageX + 10) + "px")
+                .style("top", (event.pageY - 6) + "px");
+        })
+        .on("mouseout", function () {
+            d3.select(this).classed("highlighted", false);
+            d3.selectAll(".bar-item").classed("bar-highlighted", false);
+            d3.selectAll(".paired-row").classed("bar-highlighted", false);
+            tooltip.style("opacity", 0);
+        });
+
+    // Received map
+    svg2received = d3.select("#map2-received")
+        .append("svg")
+        .attr("width", "100%")
+        .attr("height", "100%")
+        .attr("viewBox", "0 0 600 400");
+
+    const legendReceivedSvg = d3.select("#legend2-received")
+        .append("svg")
+        .attr("width", "100%")
+        .attr("height", 20);
+
+    const gradientReceived = legendReceivedSvg.append("defs")
+        .append("linearGradient")
+        .attr("id", "gradient-received");
+
+    gradientReceived.append("stop").attr("offset", "0%").attr("stop-color", "#deebf7");
+    gradientReceived.append("stop").attr("offset", "50%").attr("stop-color", "#9ecae1");
+    gradientReceived.append("stop").attr("offset", "100%").attr("stop-color", "#08519c");
+
+    legendReceivedSvg.append("rect")
+        .attr("width", "100%")
+        .attr("height", 20)
+        .style("fill", "url(#gradient-received)");
+
+    map2ReceivedPaths = svg2received.selectAll("path")
+        .data(countriesGeo)
+        .enter()
+        .append("path")
+        .attr("class", "country-path")
+        .attr("data-country", d => d.properties.name)
+        .attr("d", path)
+        .on("mouseover", function (event, d) {
+            const stats = countryStats.get(d.properties.name);
+            d3.select(this).classed("highlighted", true);
+            d3.selectAll(`.bar-item[data-country="${d.properties.name}"]`).classed("bar-highlighted", true);
+            d3.selectAll(`.paired-row`).filter(r => r.recipient.country === d.properties.name).classed("bar-highlighted", true);
+
+            if (stats) {
+                tooltip.style("opacity", 1).html(`
+                    <div class="tooltip-country">${d.properties.name}</div>
+                    <div>Received: ${fmtShort(stats.received)}</div>
+                `);
+            }
+        })
+        .on("mousemove", event => {
+            tooltip
+                .style("left", (event.pageX + 10) + "px")
+                .style("top", (event.pageY - 6) + "px");
+        })
+        .on("mouseout", function () {
+            d3.select(this).classed("highlighted", false);
+            d3.selectAll(".bar-item").classed("bar-highlighted", false);
+            d3.selectAll(".paired-row").classed("bar-highlighted", false);
+            tooltip.style("opacity", 0);
+        });
+}
+
+function renderBarsWithGradient(selector, data, valueFn, maxValue, colorScale) {
+    const container = d3.select(selector);
+    container.selectAll("*").remove();
+
+    const isDonorChart = selector === "#bars2-donors";
+
+    data.forEach((d, i) => {
+        const value = valueFn(d);
+        const barColor = colorScale(value);
+
+        const item = container.append("div")
+            .attr("class", "bar-item")
+            .attr("data-country", d.country)
+            .style("opacity", 0);
+
+        item.append("div").attr("class", "bar-rank").text(i + 1);
+        item.append("div").attr("class", "bar-label").text(d.country);
+
+        const barViz = item.append("div").attr("class", "bar-viz");
+
+        const pct = (value / maxValue) * 100;
+        barViz.append("div")
+            .attr("class", "bar-fill")
+            .style("background", barColor)
+            .style("width", "0%")
+            .transition()
+            .duration(500)
+            .delay(i * 30)
+            .style("width", pct + "%");
+
+        let displayValue = fmtShort(value);
+        if (isDonorChart) {
+            displayValue = "-" + displayValue;
+        }
+
+        item.append("div")
+            .attr("class", "bar-value")
+            .text(displayValue);
+
+        item.transition()
+            .duration(300)
+            .delay(i * 30)
+            .style("opacity", 1);
+
+        item.on("mouseover", () => {
+            d3.selectAll(`.country-path[data-country="${d.country}"]`).classed("highlighted", true);
+            d3.selectAll(`.paired-row`).filter(r =>
+                r.recipient.country === d.country || r.donor.country === d.country
+            ).classed("bar-highlighted", true);
+        }).on("mouseout", () => {
+            d3.selectAll(".country-path").classed("highlighted", false);
+            d3.selectAll(".paired-row").classed("bar-highlighted", false);
+        });
+    });
+}
+
+function updateVisualization2() {
+    if (!countryStats || countryStats.size === 0) return;
+
+    const currentEndYear = currentYear;
+    document.getElementById("viz2-year").textContent = currentEndYear;
+    document.getElementById("year-text-2a").textContent = currentEndYear;
+    document.getElementById("year-text-2b").textContent = currentEndYear;
+
+    const donatedValues = Array.from(countryStats.values()).map(d => d.donated);
+    const receivedValues = Array.from(countryStats.values()).map(d => d.received);
+
+    const maxDonated = d3.max(donatedValues) || 1;
+    const maxReceived = d3.max(receivedValues) || 1;
+
+    const donatedScale = d3.scaleSequential(d3.interpolateReds).domain([0, maxDonated]);
+    const receivedScale = d3.scaleSequential(d3.interpolateBlues).domain([0, maxReceived]);
+
+    map2DonatedPaths
+        .transition()
+        .duration(500)
+        .attr("fill", d => {
+            const stats = countryStats.get(d.properties.name);
+            if (!stats || stats.donated === 0) return "#f0f0f0";
+            return donatedScale(stats.donated);
+        })
+        .style("opacity", 1);
+
+    map2ReceivedPaths
+        .transition()
+        .duration(500)
+        .attr("fill", d => {
+            const stats = countryStats.get(d.properties.name);
+            if (!stats || stats.received === 0) return "#f0f0f0";
+            return receivedScale(stats.received);
+        })
+        .style("opacity", 1);
+
+    const topDonors = Array.from(countryStats.values())
+        .filter(d => d.donated > 0)
+        .sort((a, b) => b.donated - a.donated)
+        .slice(0, 8);
+
+    const topRecipients = Array.from(countryStats.values())
+        .filter(d => d.received > 0)
+        .sort((a, b) => b.received - a.received)
+        .slice(0, 8);
+
+    renderBarsWithGradient("#bars2-donors", topDonors, d => d.donated, maxDonated, donatedScale);
+    renderBarsWithGradient("#bars2-recipients", topRecipients, d => d.received, maxReceived, receivedScale);
+
+    d3.select("#summary2").html(`
+        <strong>Geographic Clustering (${minYearGlobal}–${currentYear}):</strong> Donors cluster in <strong>North America, Western Europe, and East Asia</strong> (wealthy developed regions).
+        Recipients concentrate in <strong>Sub-Saharan Africa, South Asia, and Latin America</strong> (developing regions).
+        A contrast exists between neighboring countries with different development levels.
+    `);
+}
+
+// ---------- VIZ 3 ----------
+function initVisualization3(purpose) {
+    svg3 = d3.select("#map3")
+        .append("svg")
+        .attr("width", "100%")
+        .attr("height", "100%")
+        .attr("viewBox", "0 0 600 400");
+
+    const legendSvg = d3.select("#legend3")
+        .append("svg")
+        .attr("width", "100%")
+        .attr("height", 20);
+
+    const gradient = legendSvg.append("defs")
+        .append("linearGradient")
+        .attr("id", "gradient3");
+
+    gradient.append("stop").attr("offset", "0%").attr("stop-color", "#deebf7");
+    gradient.append("stop").attr("offset", "50%").attr("stop-color", "#6baed6");
+    gradient.append("stop").attr("offset", "100%").attr("stop-color", "#08519c");
+
+    legendSvg.append("rect")
+        .attr("width", "100%")
+        .attr("height", 20)
+        .style("fill", "url(#gradient3)");
+
+    map3Paths = svg3.selectAll("path")
+        .data(countriesGeo)
+        .enter()
+        .append("path")
+        .attr("class", "country-path")
+        .attr("data-country", d => d.properties.name)
+        .attr("d", path)
+        .on("mouseover", function (event, d) {
+            const purpose = document.getElementById("purpose-select").value;
+            const pData = purposeData[purpose];
+            const val = pData.byCountry.get(d.properties.name) || 0;
+            d3.select(this).classed("highlighted", true);
+            d3.selectAll(`.bar-item[data-country="${d.properties.name}"]`)
+                .classed("bar-highlighted", true);
+            tooltip.style("opacity", 1).html(`
+                <div class="tooltip-country">${d.properties.name}</div>
+                <div>Aid Received: ${fmtShort(val)}</div>
+            `);
+        })
+        .on("mousemove", event => {
+            tooltip
+                .style("left", (event.pageX + 10) + "px")
+                .style("top", (event.pageY - 6) + "px");
+        })
+        .on("mouseout", function () {
+            d3.select(this).classed("highlighted", false);
+            d3.selectAll(".bar-item").classed("bar-highlighted", false);
+            tooltip.style("opacity", 0);
+        });
+
+    updateVisualization3(purpose);
+}
+
+function updateVisualization3(purpose) {
+    const pData = purposeData[purpose];
+    if (!pData) return;
+
+    d3.select("#map3-title").text(`"${purpose}" Distribution`);
+
+    const maxValue = d3.max(Array.from(pData.byCountry.values())) || 1;
+    const purposeScale = d3.scaleSequential(d3.interpolateBlues).domain([0, maxValue]);
+
+    map3Paths.transition().duration(500)
+        .attr("fill", d => {
+            const val = pData.byCountry.get(d.properties.name) || 0;
+            return val > 0 ? purposeScale(val) : "#f0f0f0";
+        });
+
+    const top10 = pData.entries.slice(0, 10);
+    const barData = top10.map(([country, value]) => ({ country, value }));
+    renderBarsWithGradient("#bars3", barData, d => d.value, maxValue, purposeScale);
+
+    d3.select("#summary3").html(`
+        <strong>Purpose: "${purpose}" (1973–2013)</strong><br>
+        Total: ${fmtShort(pData.total)} across <strong>${pData.countries} recipient countries</strong>.<br>
+        Top 10 receive <strong>${pData.concentration}%</strong> of aid for this purpose
+        (${pData.concentration > 70 ? "highly concentrated" : pData.concentration > 50 ? "moderately concentrated" : "widely distributed"}).
+        Compare different purposes to see how aid targeting varies by type.
+    `);
+}
+
+// ---------- GLOBAL YEAR CONTROL ----------
+function updateVizData(currentYear) {
+    const cumulativeData = filterCumulative(minYearGlobal, currentYear);
+    countryStats = computeCountryStats(cumulativeData);
+}
+
+function updateYear(year) {
+    currentYear = +year;
+
+    updateVizData(currentYear);
+
+    labelGlobal.textContent = `${minYearGlobal}–${currentYear}`;
+    document.getElementById("viz1-year").textContent = currentYear;
+    document.getElementById("viz2-year").textContent = currentYear;
+    document.getElementById("year-text-1").textContent = currentYear;
+    document.getElementById("year-text-2a").textContent = currentYear;
+    document.getElementById("year-text-2b").textContent = currentYear;
+
+    updateVisualization1();
+    updateVisualization2();
+}
+
+function handleStopGlobal() {
+    if (playingGlobal) {
+        clearInterval(playIntervalGlobal);
+        playingGlobal = false;
+        document.getElementById("play-button-global").textContent = "▶ Resume Animation";
+        document.getElementById("play-button-global").classList.remove("playing");
+        document.getElementById('year-indicator-1').classList.remove('active');
+        document.getElementById('year-indicator-2a').classList.remove('active');
+        document.getElementById('year-indicator-2b').classList.remove('active');
+    }
+}
+
+function handlePlayGlobal() {
+    if (!playingGlobal) {
+        playingGlobal = true;
+        document.getElementById("play-button-global").textContent = "❚❚ Pause Animation";
+        document.getElementById("play-button-global").classList.add("playing");
+        document.getElementById('year-indicator-1').classList.add('active');
+        document.getElementById('year-indicator-2a').classList.add('active');
+        document.getElementById('year-indicator-2b').classList.add('active');
+
+        let startYear = +sliderGlobal.value;
+        if (startYear >= maxYearGlobal) {
+            startYear = minYearGlobal;
+        }
+
+        sliderGlobal.value = startYear;
+        updateYear(startYear);
+
+        playIntervalGlobal = setInterval(() => {
+            let year = +sliderGlobal.value;
+
+            if (year >= maxYearGlobal) {
+                handleStopGlobal();
+            } else {
+                year = year + 1;
+                sliderGlobal.value = year;
+                updateYear(year);
+            }
+        }, 1200);
+    } else {
+        handleStopGlobal();
+    }
+}
+
+document.getElementById("play-button-global").addEventListener("click", handlePlayGlobal);
+</script>
+</body>
+</html>
