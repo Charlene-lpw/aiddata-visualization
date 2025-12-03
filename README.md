@@ -22,9 +22,11 @@ It includes an interactive world map, bar charts, and filters to help users expl
 - Dynamic updates to both visualizations
 
 **Technologies Used**
-- D3.js v7
+- D3.js
 - TopoJSON
-- HTML / CSS / JavaScript
+- HTML
+- CSS
+- JavaScript
 
 **Data Source**
 - The dataset comes from AidData, a research lab at William & Mary.
