@@ -9,7 +9,7 @@ It includes an interactive world map, bar charts, and filters to help users expl
 - Zoom & hover effects
 - Fully responsive
 
-**2. Bar Chart (Viz 2)**
+**2. Bar Chart**
 - Top 10 countries by net flow (donated − received)
 - Bars ordered from largest → smallest
 - Positive values mean receiving more
